@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import axios from 'axios';
-import { FaSearch, FaChartLine, FaArrowUp, FaArrowDown, FaVolumeUp, FaStar, FaRegStar } from 'react-icons/fa';
+import { FaSearch, FaChartLine, FaArrowUp, FaArrowDown, FaVolumeUp, FaStar, FaRegStar, FaRobot } from 'react-icons/fa';
 import debounce from 'lodash/debounce';
 import {ImStatsBars} from 'react-icons/im'
 
@@ -26,6 +26,9 @@ const Dashboard = () => {
     ma50: true,
     ma200: false
   });
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Save favorites to localStorage whenever they change
   useEffect(() => {
@@ -235,7 +238,7 @@ const Dashboard = () => {
           style: {
             colors: '#fff'
           },
-          formatter: (value) => `${(value / 1000000).toFixed(1)}M`
+          formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
         }
       }
     ],
@@ -248,24 +251,8 @@ const Dashboard = () => {
           if (typeof y !== "undefined") {
             return `$${y.toFixed(2)}`;
           }
-          return y;
-        }
-      }, {
-        formatter: function (y) {
-          if (typeof y !== "undefined") {
-            return `${(y / 1000000).toFixed(1)}M`;
-          }
-          return y;
         }
       }]
-    },
-    legend: {
-      labels: {
-        colors: '#fff'
-      }
-    },
-    theme: {
-      mode: 'dark'
     }
   };
 
@@ -340,141 +327,211 @@ const Dashboard = () => {
     }
   };
 
+  const analyzeStock = async () => {
+    try {
+      setIsAnalyzing(true);
+      const prompt = `Analyze the stock ${selectedStock} based on the following data:
+        Current Price: $${stockData?.currentPrice?.toFixed(2)}
+        24h Change: ${stockData?.priceChanges?.[stockData.priceChanges.length - 1]?.toFixed(2)}%
+        Volume: ${(stockData?.currentVolume / 1000000).toFixed(1)}M
+        High: $${stockData?.currentHigh?.toFixed(2)}
+        Low: $${stockData?.currentLow?.toFixed(2)}
+        
+        Please provide a detailed analysis including:
+        1. Current market position
+        2. Technical indicators interpretation
+        3. Risk assessment and future buying/selling
+        4. Short-term outlook
+        Keep the analysis concise but comprehensive.keep output data as small as possible`;
+
+      const response = await axios.post('http://localhost:3000/ai/analyze', {
+        prompt
+      });
+
+      if (response.data && response.data.result) {
+        setAiAnalysis(response.data.result);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error analyzing stock:', error);
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        setAiAnalysis(`Error: ${error.response.data.error || 'Server error occurred'}`);
+      } else if (error.request) {
+        // The request was made but no response was received
+        setAiAnalysis('Error: No response received from server. Please check if the server is running.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        setAiAnalysis(`Error: ${error.message}`);
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      {/* Add padding to create space from navbar */}
-      <div className="pt-20 pb-8 px-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header Section with improved styling */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6 w-full md:w-auto">
-              <div className="flex items-center space-x-4">
-                <div className="bg-cyan-600 p-3 rounded-xl shadow-lg shadow-cyan-500/20">
-                  <FaChartLine className="text-2xl" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-cyan-400">
-                    Stock Dashboard
-                  </h1>
-                  <p className="text-gray-400">Track your investments in real-time</p>
-                </div>
+    <div className="min-h-full bg-black text-white p-8 mt-10">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6 w-full md:w-auto">
+            <div className="flex items-center space-x-4">
+              <div className="bg-cyan-600 p-3 rounded-xl shadow-lg shadow-cyan-500/20">
+                <FaChartLine className="text-2xl" />
               </div>
-              
-              {/* Updated Search Bar */}
-              <div className="w-full md:w-auto">
-                <form onSubmit={handleSearch} className="flex items-center">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      //value={searchQuery}
-                      onChange={handleSearchInput}
-                      placeholder="Search stock symbol (e.g., AAPL, MSFT)"
-                      className="w-full bg-black text-white pl-12 pr-4 py-3 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 border border-white/20 placeholder-gray-400 caret-white"
-                    />
-                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  </div>
-                  <button
-                    type="submit"
-                    className="bg-black hover:bg-white hover:text-black px-6 py-3 rounded-r-xl hover:bg-cyan-700 transition-all duration-200 font-medium shadow-lg shadow-cyan-500/20"
-                  >
-                    Search
-                  </button>
-                </form>
+              <div>
+                <h1 className="text-3xl font-bold text-cyan-400">
+                  Stock Dashboard
+                </h1>
+                <p className="text-gray-400">Track your investments in real-time</p>
               </div>
             </div>
             
-            {/* Updated Favorites Section */}
-            <div className="bg-gray-800/50 backdrop-blur-sm p-4 rounded-xl border border-gray-700 w-full md:w-auto">
-              <h2 className="text-lg font-semibold mb-3 flex items-center">
-                <FaStar className="text-cyan-400 mr-2" />
-                Favorites
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {favorites.map(symbol => (
-                  <div
-                    key={symbol}
-                    className="flex items-center space-x-2 bg-gray-700/50 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-gray-600 transition-all duration-200 cursor-pointer border border-gray-600"
-                    onClick={() => fetchStockData(symbol)}
-                  >
-                    <span className="font-medium">{symbol}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(symbol);
-                      }}
-                      className="text-cyan-400 hover:text-cyan-300 transition-colors"
-                    >
-                      <FaStar />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Updated Stock Info and Controls */}
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 mb-6 border border-gray-700">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="flex items-center space-x-4">
-                <h2 className="text-2xl font-bold text-cyan-400">{selectedStock}</h2>
+            <div className="w-full md:w-auto">
+              <form onSubmit={handleSearch} className="flex items-center">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    //value={searchQuery}
+                    onChange={handleSearchInput}
+                    placeholder="Search stock symbol (e.g., AAPL, MSFT)"
+                    className="w-full bg-black text-white pl-12 pr-4 py-3 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 border border-white/20 placeholder-gray-400 caret-white"
+                  />
+                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                </div>
                 <button
-                  onClick={() => toggleFavorite(selectedStock)}
-                  className="text-2xl text-cyan-400 hover:text-cyan-300 transition-colors transform hover:scale-110"
+                  type="submit"
+                  className="bg-black hover:bg-white hover:text-black px-6 py-3 rounded-r-xl hover:bg-cyan-700 transition-all duration-200 font-medium shadow-lg shadow-cyan-500/20"
                 >
-                  {isFavorite(selectedStock) ? <FaStar /> : <FaRegStar />}
+                  Search
                 </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {timeframes.map((tf) => (
+              </form>
+            </div>
+          </div>
+          
+          <div className="bg-gray-800/50 backdrop-blur-sm p-4 rounded-xl border border-gray-700 w-full md:w-auto">
+            <h2 className="text-lg font-semibold mb-3 flex items-center">
+              <FaStar className="text-cyan-400 mr-2" />
+              Favorites
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {favorites.map(symbol => (
+                <div
+                  key={symbol}
+                  className="flex items-center space-x-2 bg-gray-700/50 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-gray-600 transition-all duration-200 cursor-pointer border border-gray-600"
+                  onClick={() => fetchStockData(symbol)}
+                >
+                  <span className="font-medium">{symbol}</span>
                   <button
-                    key={tf.value}
-                    onClick={() => setTimeframe(tf.value)}
-                    className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                      timeframe === tf.value
-                        ? 'bg-white text-black shadow-lg shadow-cyan-500/20'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(symbol);
+                    }}
+                    className="text-cyan-400 hover:text-cyan-300 transition-colors"
                   >
-                    {tf.label}
+                    <FaStar />
                   </button>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 mb-6 border border-gray-700">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-2xl font-bold text-cyan-400">{selectedStock}</h2>
+              <button
+                onClick={() => toggleFavorite(selectedStock)}
+                className="text-2xl text-cyan-400 hover:text-cyan-300 transition-colors transform hover:scale-110"
+              >
+                {isFavorite(selectedStock) ? <FaStar /> : <FaRegStar />}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {timeframes.map((tf) => (
+                <button
+                  key={tf.value}
+                  onClick={() => setTimeframe(tf.value)}
+                  className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                    timeframe === tf.value
+                      ? 'bg-white text-black shadow-lg shadow-cyan-500/20'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
+            <h3 className="text-gray-400 mb-2">Current Price</h3>
+            <p className="text-2xl font-bold">${stockData?.currentPrice?.toFixed(2)}</p>
+          </div>
+          <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
+            <h3 className="text-gray-400 mb-2">Price Change</h3>
+            <p className={`text-2xl font-bold flex items-center ${
+              stockData?.priceChanges?.[0] >= 0 ? "text-green-500" : "text-red-500"
+            }`}>
+              {stockData?.priceChanges?.[0] >= 0 ? <FaArrowUp className="mr-2" /> : <FaArrowDown className="mr-2" />}
+              {Math.abs(stockData?.priceChanges?.[0]).toFixed(2)}%
+            </p>
+          </div>
+          <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
+            <h3 className="text-gray-400 mb-2">Volume</h3>
+            <p className="text-2xl font-bold flex items-center">
+              <ImStatsBars className="mr-2" />
+              {(stockData?.currentVolume / 1000000).toFixed(2)}M
+            </p>
+          </div>
+          <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
+            <h3 className="text-gray-400 mb-2">High/Low</h3>
+            <p className="text-2xl font-bold">
+              ${stockData?.currentHigh?.toFixed(2)} / ${stockData?.currentLow?.toFixed(2)}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-[#141414] rounded-lg p-6 mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+            <div className="flex items-center space-x-4 mb-4 md:mb-0">
+              <h2 className="text-2xl font-bold">{selectedStock}</h2>
+              <button
+                onClick={() => toggleFavorite(selectedStock)}
+                className="text-yellow-500 hover:text-yellow-400"
+              >
+                {isFavorite(selectedStock) ? <FaStar /> : <FaRegStar />}
+              </button>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => {
+                  setShowAIModal(true);
+                  analyzeStock();
+                }}
+                className="flex items-center px-4 py-2 bg-[#3affa3] text-black rounded-lg hover:bg-[#3affa3]/90 transition-colors duration-300"
+              >
+                <FaRobot className="mr-2" />
+                ASK ZELBI AI
+              </button>
+              {timeframes.map((tf) => (
+                <button
+                  key={tf.value}
+                  onClick={() => setTimeframe(tf.value)}
+                  className={`px-4 py-2 rounded-lg ${
+                    timeframe === tf.value ? 'bg-[#3affa3] text-black' : 'bg-gray-800 text-white'
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Stock Info Cards */}
-          {stockData && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
-                <h3 className="text-gray-400 mb-2">Current Price</h3>
-                <p className="text-2xl font-bold">${stockData.currentPrice.toFixed(2)}</p>
-              </div>
-              <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
-                <h3 className="text-gray-400 mb-2">Price Change</h3>
-                <p className={`text-2xl font-bold flex items-center ${
-                  stockData.priceChanges[0] >= 0 ? "text-green-500" : "text-red-500"
-                }`}>
-                  {stockData.priceChanges[0] >= 0 ? <FaArrowUp className="mr-2" /> : <FaArrowDown className="mr-2" />}
-                  {Math.abs(stockData.priceChanges[0]).toFixed(2)}%
-                </p>
-              </div>
-              <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
-                <h3 className="text-gray-400 mb-2">Volume</h3>
-                <p className="text-2xl font-bold flex items-center">
-                  <ImStatsBars className="mr-2" />
-                  {(stockData.currentVolume / 1000000).toFixed(2)}M
-                </p>
-              </div>
-              <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
-                <h3 className="text-gray-400 mb-2">High/Low</h3>
-                <p className="text-2xl font-bold">
-                  ${stockData.currentHigh.toFixed(2)} / ${stockData.currentLow.toFixed(2)}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Charts Section */}
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
@@ -485,7 +542,6 @@ const Dashboard = () => {
             </div>
           ) : stockData ? (
             <div className="space-y-8">
-              {/* Trading View Chart */}
               <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-semibold">Trading View</h3>
@@ -550,7 +606,6 @@ const Dashboard = () => {
                 />
               </div>
 
-              {/* Candlestick Chart */}
               <div className="bg-[#0a0a0a] rounded-2xl p-6 border border-[#1a1a1a]">
                 <h3 className="text-xl font-semibold mb-4">Price Chart</h3>
                 <ReactApexChart
@@ -564,6 +619,34 @@ const Dashboard = () => {
           ) : null}
         </div>
       </div>
+
+      {/* AI Analysis Modal */}
+      {showAIModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#141414] rounded-lg p-6 max-w-2xl w-full mx-4 relative">
+            <button
+              onClick={() => setShowAIModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+            <div className="flex items-center mb-4">
+              <FaRobot className="text-[#3affa3] text-2xl mr-2" />
+              <h3 className="text-xl font-bold">ZELBI AI Analysis</h3>
+            </div>
+            {isAnalyzing ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#3affa3]"></div>
+                <span className="ml-2">Analyzing {selectedStock}...</span>
+              </div>
+            ) : (
+              <div className="prose prose-invert max-w-none">
+                <p className="whitespace-pre-wrap">{aiAnalysis}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
